@@ -1,0 +1,29 @@
+D:.
+├─database          # Database related code
+│  └─__pycache__
+├─engvenv           # Python virtual environment
+│  ├─Include
+│  ├─Lib
+│  └─Scripts
+├─models            # Data models/business logic
+│  └─__pycache__
+├─services          # Service layer
+│  └─__pycache__
+├─storage           # Data storage
+├─ui                # User interface
+│  └─__pycache__
+├─tests             # Unit and integration tests
+│  ├─unit
+│  └─integration
+├─config            # Configuration files
+├─static            # Static resources
+│  ├─images
+│  ├─css
+│  └─js
+├─docs              # Documentation
+│  ├─api
+│  └─user
+├─resources         # Stored materials/data (renamed from 存储的资料)
+├─__pycache__       # Compiled Python files
+├─.gitignore        # Git ignore file
+└─requirements.txt  # Dependencies list

@@ -1,0 +1,14 @@
+# Virtual environment
+engvenv/
+
+# Compiled Python files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+
+# IDE files
+.vscode/
+.idea/
