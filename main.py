@@ -15,7 +15,6 @@ def main():
     """Main entry point for the application."""
     # Create root window
     root = tk.Tk()
-    root.title("学习资料管理系统")
     
     # Initialize database
     db_path = os.path.join(os.path.dirname(__file__), "database", "files.db")

@@ -1,32 +1,65 @@
-# 学习资料管理系统
+# 英语学习助手
 
-A simple desktop application for managing and organizing files with metadata.
+一个现代化的英语学习辅助工具，帮助用户管理和学习英语材料。
 
-## Features
+## 功能特点
 
-- Upload and store files with metadata
-- Search and browse stored files
-- Preview and edit file content and metadata
-- SQLite-based database for storage
+- 文件管理
+  - 上传和存储学习材料
+  - 搜索和浏览已存储的文件
+  - 预览和编辑文件内容及元数据
 
-## Project Structure
+- 学习助手
+  - 分析文本难度级别（CEFR标准）
+  - 自动生成练习题
+  - 语法要点解析
+  - 智能问答
 
-- `main.py`: Application entry point
-- `database/`: Database operations and schema
-- `models/`: Data models
-- `services/`: Business logic services including LLM processing (placeholder)
-- `ui/`: User interface components
-- `storage/`: Directory for stored files
+## 项目结构
 
-## How to Run
+- `main.py`: 应用程序入口
+- `database/`: 数据库操作和模式
+- `models/`: 数据模型
+- `services/`: 业务逻辑服务，包括 LLM 处理
+- `ui/`: 用户界面组件
+  - `main_window.py`: 主窗口
+  - `upload_tab.py`: 文件上传界面
+  - `query_tab.py`: 文件查询界面
+  - `edit_tab.py`: 文件编辑界面
+  - `learn_tab.py`: 学习助手界面
+- `storage/`: 存储文件的目录
 
-1. Make sure Python 3.6+ is installed
-2. Clone this repository
-3. Run `python main.py`
+## 运行说明
 
-## Future Enhancements
+1. 确保已安装 Python 3.6+
+2. 克隆此仓库
+3. 安装依赖：
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. 运行程序：
+   ```bash
+   python main.py
+   ```
 
-- Integration with LLM for advanced text processing
-- Enhanced metadata extraction capabilities
-- File categorization and tagging
-- User authentication and file sharing
+## 使用说明
+
+1. 首次运行时，需要设置 DeepSeek API 密钥
+2. 主界面包含四个功能标签页：
+   - 上传文件：添加新的学习材料
+   - 查询文件：搜索和浏览已有材料
+   - 编辑文件：修改文件内容和元数据
+   - 学习助手：使用 AI 辅助学习功能
+
+## 学习助手功能
+
+- **难度分析**：分析文本的难度级别，提供 CEFR 标准评估
+- **练习题生成**：基于文本内容自动生成练习题
+- **语法解析**：分析并解释文本中的语法要点
+- **智能问答**：回答关于学习材料的问题
+
+## 注意事项
+
+- 需要有效的 DeepSeek API 密钥才能使用 AI 功能
+- 建议定期备份学习材料
+- 文件存储在本地 storage 目录中

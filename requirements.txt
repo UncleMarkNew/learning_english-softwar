@@ -23,6 +23,7 @@ sortedcontainers==2.4.0
 soupsieve==2.6
 SpeechRecognition==3.8.1
 textract==1.6.5
+ttkthemes==3.2.2
 typing_extensions==4.12.2
 tzdata==2025.1
 tzlocal==5.3

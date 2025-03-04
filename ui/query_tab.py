@@ -1,5 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
+from file_utils import FileUtils
+import os
 
 class QueryTab(ttk.Frame):
     def __init__(self, parent, app):
@@ -13,16 +15,44 @@ class QueryTab(ttk.Frame):
         select_frame = ttk.LabelFrame(self, text="选择要查询的文件")
         select_frame.pack(fill=tk.X, padx=5, pady=5)
         
+        # 文件信息显示
+        info_frame = ttk.Frame(select_frame)
+        info_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(info_frame, text="文件名：").pack(side=tk.LEFT)
         self.file_name_var = tk.StringVar()
-        ttk.Entry(select_frame, textvariable=self.file_name_var, width=70, state='readonly').pack(side=tk.LEFT, padx=5, pady=5)
-        ttk.Button(select_frame, text="选择...", command=self.on_select).pack(side=tk.LEFT, padx=5, pady=5)
+        ttk.Entry(info_frame, textvariable=self.file_name_var, width=50, state='readonly').pack(side=tk.LEFT, padx=5)
+        
+        # 文件类型和编码信息
+        type_frame = ttk.Frame(select_frame)
+        type_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(type_frame, text="文件类型：").pack(side=tk.LEFT)
+        self.filetype_var = tk.StringVar()
+        ttk.Entry(type_frame, textvariable=self.filetype_var, width=20, state='readonly').pack(side=tk.LEFT, padx=5)
+        
+        ttk.Label(type_frame, text="编码：").pack(side=tk.LEFT)
+        self.encoding_var = tk.StringVar()
+        ttk.Entry(type_frame, textvariable=self.encoding_var, width=20, state='readonly').pack(side=tk.LEFT, padx=5)
         
         # File list (Treeview)
-        self.file_tree = ttk.Treeview(self, columns=("文件名", "类型", "上传日期"), show="headings")
+        tree_frame = ttk.Frame(self)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.file_tree = ttk.Treeview(tree_frame, columns=("文件名", "类型", "上传日期"), show="headings")
         self.file_tree.heading("文件名", text="文件名")
         self.file_tree.heading("类型", text="类型")
         self.file_tree.heading("上传日期", text="上传日期")
-        self.file_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # 添加滚动条
+        scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.file_tree.yview)
+        self.file_tree.configure(yscrollcommand=scrollbar.set)
+        
+        self.file_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # 绑定双击事件
+        self.file_tree.bind('<Double-1>', lambda e: self.on_select())
         
         # 添加文件内容显示区域
         content_frame = ttk.LabelFrame(self, text="文件内容")
@@ -43,6 +73,11 @@ class QueryTab(ttk.Frame):
     
     def load_file_list(self):
         """Load files into the Treeview."""
+        # 清空现有内容
+        for item in self.file_tree.get_children():
+            self.file_tree.delete(item)
+            
+        # 加载文件列表
         files = self.app.db_manager.get_files_for_selection()
         for file in files:
             file_id, name, file_type, upload_date = file
@@ -66,43 +101,27 @@ class QueryTab(ttk.Frame):
         # 获取文件的完整信息
         file_info = self.app.db_manager.get_file_for_query(file_id)
         if file_info:
-            # 更新界面显示
-            self.display_file_info(file_info)
-            
-            # 准备与 LLM 交互
-            self.prepare_for_llm_interaction(file_info)
+            try:
+                # 更新文件名和类型信息
+                self.file_name_var.set(file_info["original_name"])
+                file_type, file_size = os.path.splitext(file_info["original_name"])[1], os.path.getsize(file_info["stored_path"])
+                self.filetype_var.set(f"{file_type} ({file_size} 字节)")
+                
+                # 使用 FileUtils 预览文件内容
+                encoding = FileUtils.preview_file(file_info["stored_path"], self.content_text)
+                self.encoding_var.set(encoding or "未知")
+                
+                # 显示元数据
+                metadata = file_info["metadata"] or ""
+                if isinstance(metadata, bytes):
+                    metadata = metadata.decode('utf-8')
+                elif not isinstance(metadata, str):
+                    metadata = str(metadata)
+                
+                self.metadata_text.delete(1.0, tk.END)
+                self.metadata_text.insert(tk.END, metadata)
+                
+            except Exception as e:
+                messagebox.showerror("错误", f"预览文件时出错：{str(e)}")
         else:
             messagebox.showerror("错误", "未找到文件")
-    
-    def display_file_info(self, file_info):
-        """Display file information in the UI."""
-        self.file_name_var.set(file_info["original_name"])
-        self.content_text.delete(1.0, tk.END)
-        self.content_text.insert(tk.END, file_info["content"])
-        self.metadata_text.delete(1.0, tk.END)
-        self.metadata_text.insert(tk.END, file_info["metadata"])
-    
-    def prepare_for_llm_interaction(self, file_info):
-        """Prepare file information for future LLM interaction."""
-        if self.app.llm_processor:
-            # 调用 LLM 处理内容
-            llm_response = self.call_llm(file_info["content"], file_info["metadata"])
-            
-            # 将 LLM 解析结果保存到 metadata 中
-            if llm_response:
-                file_info["metadata"] = llm_response
-                self.app.db_manager.update_file(file_info["id"], file_info["content"], file_info["metadata"])
-                messagebox.showinfo("成功", "LLM 解析结果已保存")
-        else:
-            messagebox.showwarning("警告", "未初始化 LLM 处理器")
-    
-    def call_llm(self, content, metadata):
-        """Simulate calling an LLM for content analysis."""
-        # 这里是模拟的 LLM 调用逻辑
-        print("Sending content and metadata to LLM...")
-        print(f"Content: {content}")
-        print(f"Metadata: {metadata}")
-        
-        # 模拟 LLM 返回的解析结果
-        llm_response = "LLM analysis result: This is a sample response."
-        return llm_response

@@ -1,5 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
+import re
+from file_utils import FileUtils
+import os
 
 class EditTab(ttk.Frame):
     """Tab for editing files in the system."""
@@ -9,6 +12,9 @@ class EditTab(ttk.Frame):
         super().__init__(parent)
         self.app = app
         self.edit_file_id = None
+        self.current_content = None  # 存储完整内容
+        self.current_segments = []   # 存储分段后的内容
+        self.current_segment_index = 0  # 当前显示的段落索引
         self.setup_ui()
     
     def setup_ui(self):
@@ -17,9 +23,36 @@ class EditTab(ttk.Frame):
         select_frame = ttk.LabelFrame(self, text="选择要修改的文件")
         select_frame.pack(fill=tk.X, padx=5, pady=5)
         
+        # 文件信息显示
+        info_frame = ttk.Frame(select_frame)
+        info_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(info_frame, text="文件名：").pack(side=tk.LEFT)
         self.edit_file_var = tk.StringVar()
-        ttk.Entry(select_frame, textvariable=self.edit_file_var, width=70, state='readonly').pack(side=tk.LEFT, padx=5, pady=5)
-        ttk.Button(select_frame, text="选择...", command=self.select_file_to_edit).pack(side=tk.LEFT, padx=5, pady=5)
+        ttk.Entry(info_frame, textvariable=self.edit_file_var, width=50, state='readonly').pack(side=tk.LEFT, padx=5)
+        ttk.Button(info_frame, text="选择...", command=self.select_file_to_edit).pack(side=tk.LEFT, padx=5)
+        
+        # 文件类型和编码信息
+        type_frame = ttk.Frame(select_frame)
+        type_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(type_frame, text="文件类型：").pack(side=tk.LEFT)
+        self.filetype_var = tk.StringVar()
+        ttk.Entry(type_frame, textvariable=self.filetype_var, width=20, state='readonly').pack(side=tk.LEFT, padx=5)
+        
+        ttk.Label(type_frame, text="编码：").pack(side=tk.LEFT)
+        self.encoding_var = tk.StringVar()
+        ttk.Entry(type_frame, textvariable=self.encoding_var, width=20, state='readonly').pack(side=tk.LEFT, padx=5)
+        
+        # Navigation buttons
+        nav_frame = ttk.Frame(self)
+        nav_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Button(nav_frame, text="上一段", command=self.prev_segment).pack(side=tk.LEFT, padx=5)
+        ttk.Button(nav_frame, text="下一段", command=self.next_segment).pack(side=tk.LEFT, padx=5)
+        
+        self.segment_info = ttk.Label(nav_frame, text="")
+        self.segment_info.pack(side=tk.LEFT, padx=5)
         
         # Edit area
         edit_content_frame = ttk.LabelFrame(self, text="编辑文件内容")
@@ -38,6 +71,72 @@ class EditTab(ttk.Frame):
         # Save button
         save_button = ttk.Button(self, text="保存修改", command=self.save_edit)
         save_button.pack(pady=10)
+    
+    def smart_split_content(self, content):
+        """智能分段内容"""
+        if not content:
+            return []
+            
+        # 首先按空行分段
+        segments = re.split(r'\n\s*\n', content)
+        
+        # 如果段落太长，进一步分割
+        MAX_SEGMENT_LENGTH = 2000
+        final_segments = []
+        
+        for segment in segments:
+            if len(segment) > MAX_SEGMENT_LENGTH:
+                # 按句子分割长段落
+                sentences = re.split(r'([.!?。！？]\s*)', segment)
+                current_segment = ""
+                
+                for i in range(0, len(sentences), 2):
+                    sentence = sentences[i]
+                    # 添加标点符号（如果有）
+                    if i + 1 < len(sentences):
+                        sentence += sentences[i + 1]
+                        
+                    if len(current_segment) + len(sentence) > MAX_SEGMENT_LENGTH:
+                        if current_segment:
+                            final_segments.append(current_segment)
+                        current_segment = sentence
+                    else:
+                        current_segment += sentence
+                
+                if current_segment:
+                    final_segments.append(current_segment)
+            else:
+                final_segments.append(segment)
+        
+        return final_segments
+    
+    def display_current_segment(self):
+        """显示当前段落"""
+        if not self.current_segments:
+            return
+            
+        self.edit_content_text.delete(1.0, tk.END)
+        self.edit_content_text.insert(tk.END, self.current_segments[self.current_segment_index])
+        
+        # 更新段落信息
+        total_segments = len(self.current_segments)
+        self.segment_info.config(text=f"第 {self.current_segment_index + 1} 段，共 {total_segments} 段")
+    
+    def prev_segment(self):
+        """显示上一段"""
+        if self.current_segment_index > 0:
+            # 保存当前段落的修改
+            self.current_segments[self.current_segment_index] = self.edit_content_text.get(1.0, tk.END).rstrip()
+            self.current_segment_index -= 1
+            self.display_current_segment()
+    
+    def next_segment(self):
+        """显示下一段"""
+        if self.current_segments and self.current_segment_index < len(self.current_segments) - 1:
+            # 保存当前段落的修改
+            self.current_segments[self.current_segment_index] = self.edit_content_text.get(1.0, tk.END).rstrip()
+            self.current_segment_index += 1
+            self.display_current_segment()
     
     def select_file_to_edit(self):
         """Open dialog to select a file for editing."""
@@ -68,7 +167,6 @@ class EditTab(ttk.Frame):
             file_id, name, file_type, upload_date = file
             file_tree.insert('', tk.END, iid=file_id, values=(name, file_type, upload_date))
         
-        # Confirm button callback
         def on_select():
             selection = file_tree.selection()
             if not selection:
@@ -76,60 +174,65 @@ class EditTab(ttk.Frame):
                 return
                 
             file_id = selection[0]
-            
-            result = self.app.db_manager.get_file_for_edit(file_id)
+            result = self.app.db_manager.get_file_for_query(file_id)  # 使用 get_file_for_query 替代 get_file_for_edit
             if result:
-                name, content, metadata = result
-                
-                self.edit_file_id = file_id
-                self.edit_file_var.set(name)
-                
-                self.edit_content_text.delete(1.0, tk.END)
-                self.edit_content_text.insert(tk.END, content or "")
-                
-                self.edit_metadata_text.delete(1.0, tk.END)
-                self.edit_metadata_text.insert(tk.END, metadata or "")
-                
-                select_dialog.destroy()
+                try:
+                    # 更新文件信息
+                    self.edit_file_var.set(result["original_name"])
+                    file_type, file_size = os.path.splitext(result["original_name"])[1], os.path.getsize(result["stored_path"])
+                    self.filetype_var.set(f"{file_type} ({file_size} 字节)")
+                    
+                    # 使用 FileUtils 预览文件内容
+                    encoding = FileUtils.preview_file(result["stored_path"], self.edit_content_text)
+                    self.encoding_var.set(encoding or "未知")
+                    
+                    # 获取文件内容并分段
+                    self.current_content = self.edit_content_text.get(1.0, tk.END).strip()
+                    self.current_segments = self.smart_split_content(self.current_content)
+                    self.current_segment_index = 0
+                    
+                    # 显示第一段
+                    if self.current_segments:
+                        self.display_current_segment()
+                    
+                    # 显示元数据
+                    self.edit_metadata_text.delete(1.0, tk.END)
+                    if result["metadata"]:
+                        self.edit_metadata_text.insert(tk.END, result["metadata"])
+                    
+                    # 保存文件ID
+                    self.edit_file_id = file_id
+                    select_dialog.destroy()
+                    
+                except Exception as e:
+                    messagebox.showerror("错误", f"加载文件时出错：{str(e)}")
+            else:
+                messagebox.showerror("错误", "无法加载选中的文件")
         
-        # Add confirm and cancel buttons
-        button_frame = ttk.Frame(select_dialog)
-        button_frame.pack(fill=tk.X, padx=5, pady=5)
-        
-        ttk.Button(button_frame, text="确定", command=on_select).pack(side=tk.RIGHT, padx=5)
-        ttk.Button(button_frame, text="取消", command=select_dialog.destroy).pack(side=tk.RIGHT, padx=5)
+        # Add select button
+        ttk.Button(select_dialog, text="选择", command=on_select).pack(pady=5)
     
     def save_edit(self):
-        """Save edited file content and metadata."""
+        """Save the edited content back to the file."""
         if not self.edit_file_id:
-            messagebox.showerror("错误", "请先选择一个文件")
+            messagebox.showerror("错误", "请先选择要编辑的文件")
             return
             
         try:
-            # Get edited content and metadata
-            content = self.edit_content_text.get(1.0, tk.END)
-            metadata = self.edit_metadata_text.get(1.0, tk.END)
+            # 保存当前段落的修改
+            if self.current_segments:
+                self.current_segments[self.current_segment_index] = self.edit_content_text.get(1.0, tk.END).rstrip()
+                
+                # 合并所有段落
+                content = "\n\n".join(self.current_segments)
+            else:
+                content = self.edit_content_text.get(1.0, tk.END).strip()
+                
+            metadata = self.edit_metadata_text.get(1.0, tk.END).strip()
             
-            # Update database
+            # 更新数据库
             self.app.db_manager.update_file(self.edit_file_id, content, metadata)
-            
-            # Update status bar
-            self.app.set_status(f"文件 '{self.edit_file_var.get()}' 修改成功")
-            
-            # Clear edit area
-            self.edit_file_id = None
-            self.edit_file_var.set("")
-            self.edit_content_text.delete(1.0, tk.END)
-            self.edit_metadata_text.delete(1.0, tk.END)
-            
-            messagebox.showinfo("成功", "文件修改保存成功")
+            messagebox.showinfo("成功", "文件修改已保存")
             
         except Exception as e:
-            messagebox.showerror("错误", f"保存文件时出错: {e}")
-    
-    def clear(self):
-        """Clear all fields in the edit tab."""
-        self.edit_file_id = None
-        self.edit_file_var.set("")
-        self.edit_content_text.delete(1.0, tk.END)
-        self.edit_metadata_text.delete(1.0, tk.END)
+            messagebox.showerror("错误", f"保存修改时出错：{str(e)}")
